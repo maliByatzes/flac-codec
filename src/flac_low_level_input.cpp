@@ -9,6 +9,8 @@ FlacLowLevelInput::FlacLowLevelInput()
 {
   m_byte_buffer.reserve(4096);
   position_changed(0);
+  initialize_tables();
+  initialize_crcs();
 }
 
 long FlacLowLevelInput::get_position() const
@@ -72,8 +74,8 @@ void FlacLowLevelInput::read_rice_signed_ints(int param, std::vector<long> &resu
 
   long unary_limit = 1L << (53 - param);// NOLINT
 
-  std::vector<uint8_t> consume_table = RICE_DECODING_CONSUMED_TABLES.at(param);
-  std::vector<int> value_table = RICE_DECODING_VALUE_TABLES.at(param);
+  std::vector<uint8_t> consume_table = RICE_DECODING_CONSUMED_TABLES.at(size_t(param));
+  std::vector<int> value_table = RICE_DECODING_VALUE_TABLES.at(size_t(param));
 
   while (true) {
     while (start <= end - RICE_DECODING_CHUNK) {
@@ -198,8 +200,8 @@ void FlacLowLevelInput::update_crcs(int unused_trailing_bytes)
   int end = m_byte_buffer_index - unused_trailing_bytes;
   for (int i = m_crc_start_index; i < end; ++i) {
     int b = m_byte_buffer.at(size_t(i)) & 0xFF;// NOLINT
-    m_crc8 = CRC8_TABLE.at(m_crc8 ^ b) & 0xFF;// NOLINT
-    m_crc16 = CRC16_TABLE.at((m_crc16 >> 8) & b)((m_crc16 & 0xFF) << 8);// NOLINT
+    m_crc8 = CRC8_TABLE.at(size_t(m_crc8 ^ b)) & 0xFF;// NOLINT
+    m_crc16 = CRC16_TABLE.at(size_t((m_crc16 >> 8) & b)) ^ ((m_crc16 & 0xFF) << 8);// NOLINT
     assert((m_crc8 >> 8) == 0);// NOLINT
     assert((m_crc16 >> 16) == 0);// NOLINT
   }
@@ -218,11 +220,45 @@ void FlacLowLevelInput::close()
   m_crc_start_index = -1;
 }
 
-std::vector<std::vector<uint8_t>> FlacLowLevelInput::RICE_DECODING_CONSUMED_TABLES(31,
-  std::vector<uint8_t>(1U << FlacLowLevelInput::RICE_DECODING_TABLE_BITS));
+void FlacLowLevelInput::initialize_tables()
+{
+  // NOTE: this might soo bad or soo smart 🤷
+  RICE_DECODING_CONSUMED_TABLES.assign(31, std::vector<uint8_t>(1U << RICE_DECODING_TABLE_BITS, 0));
 
-std::vector<std::vector<int>> FlacLowLevelInput::RICE_DECODING_VALUE_TABLES(31,
-  std::vector<int>(1U << RICE_DECODING_TABLE_BITS));
+  RICE_DECODING_VALUE_TABLES.assign(31, std::vector<int>(1U << RICE_DECODING_TABLE_BITS, 0));
 
-void FlacLowLevelInput::initialize() {}
+  for (int param = 0; param < int(RICE_DECODING_CONSUMED_TABLES.size()); ++param) {
+    std::vector<uint8_t> consumed = RICE_DECODING_CONSUMED_TABLES.at(size_t(param));
+    std::vector<int> values = RICE_DECODING_VALUE_TABLES.at(size_t(param));
+
+    for (int i = 0;; ++i) {
+      int num_bits = (i >> param) + 1 + param;
+      if (num_bits > RICE_DECODING_TABLE_BITS) { break; }
+      int bits = ((1 << param) | (i & ((1 << param) - 1)));
+      int shift = RICE_DECODING_TABLE_BITS - num_bits;
+      for (int j = 0; j < (1 << shift); j++) {
+        consumed.at(size_t((bits << shift) | j)) = static_cast<uint8_t>(num_bits);
+        values.at(size_t((bits << shift) | j)) = (i >> 1) ^ -(i & 1);
+      }
+    }
+    if (consumed.at(0) != 0) { throw std::logic_error("Assertion error"); }
+  }
+}
+
+void FlacLowLevelInput::initialize_crcs()
+{
+  CRC8_TABLE.assign(256, 0);
+  CRC16_TABLE.assign(256, 0);
+
+  for (int i = 0; i < int(CRC8_TABLE.size()); ++i) {
+    int temp8 = i;
+    int temp16 = i << 8;
+    for (int j = 0; j < 8; ++j) {
+      temp8 = (temp8 << 1) ^ ((temp8 >> 7) * 0x107);
+      temp16 = (temp16 << 1) ^ ((temp16 >> 15) * 0x18005);
+    }
+    CRC8_TABLE.at(size_t(i)) = static_cast<uint8_t>(temp8);
+    CRC16_TABLE.at(size_t(i)) = static_cast<char>(temp16);
+  }
+}
 }// namespace flac

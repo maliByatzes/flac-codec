@@ -75,7 +75,12 @@ private:
   static std::vector<std::vector<int>> RICE_DECODING_VALUE_TABLES;
   static const int RICE_DECODING_CHUNK = 4;
 
-  static void initialize();
+  static void initialize_tables();
+
+  static std::vector<uint8_t> CRC8_TABLE;
+  static std::vector<char> CRC16_TABLE;
+
+  static void initialize_crcs();
 };
 
 }// namespace flac
