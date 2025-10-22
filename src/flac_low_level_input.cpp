@@ -1,11 +1,13 @@
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <flac_codec/flac_low_level_input.h>
 #include <optional>
 #include <stdexcept>
 #include <sys/types.h>
-#include <variant>
+#include <utility>
+#include <vector>
 
 namespace flac {
 
@@ -35,7 +37,7 @@ void FlacLowLevelInput::position_changed(size_t pos)
   m_byte_buffer_index = 0;
   m_bit_buffer = 0;
   m_bit_buffer_len = 0;
-  reset_crcs();
+  // reset_crcs(); FIXME: comment out 4 now
 }
 
 void FlacLowLevelInput::check_byte_aligned() const
@@ -45,9 +47,7 @@ void FlacLowLevelInput::check_byte_aligned() const
 
 int64_t FlacLowLevelInput::read_uint(size_t num_of_bits)
 {
-  if (num_of_bits < 0 || num_of_bits > 32) {
-    throw std::invalid_argument("Invalid argument, nidx is less than 0 or greater than 32");
-  }
+  if (num_of_bits > 32) { throw std::invalid_argument("Invalid argument, nidx is less than 0 or greater than 32"); }
 
 
   while (m_bit_buffer_len < num_of_bits) {
@@ -57,7 +57,7 @@ int64_t FlacLowLevelInput::read_uint(size_t num_of_bits)
 
     m_bit_buffer = (m_bit_buffer << 8U) | byte;
     m_bit_buffer_len += 8U;
-    assert(0U <= m_bit_buffer_len && m_bit_buffer_len <= 64U);
+    assert(m_bit_buffer_len <= 64U);
   }
 
   // NOTE: okay this might actually make the program go 💥
@@ -68,7 +68,7 @@ int64_t FlacLowLevelInput::read_uint(size_t num_of_bits)
     return static_cast<uint32_t>(result);
   } else {
     m_bit_buffer_len -= num_of_bits;
-    assert(0U <= m_bit_buffer_len && m_bit_buffer_len <= 64U);
+    assert(m_bit_buffer_len && m_bit_buffer_len <= 64U);
     return static_cast<int32_t>(result);
   }
 }
@@ -83,7 +83,7 @@ int32_t FlacLowLevelInput::read_signed_int(size_t num_of_bits)
 
 void FlacLowLevelInput::read_rice_signed_ints(size_t param, std::vector<int64_t> &result, size_t start, size_t end)
 {
-  if (param < 0 || param > 31) { throw std::invalid_argument("Invalid argument"); }
+  if (param > 31) { throw std::invalid_argument("Invalid argument"); }
 
   auto unary_limit = 1UL << (53U - param);
 
@@ -169,7 +169,7 @@ void FlacLowLevelInput::read_fully(std::vector<uint8_t> &bytes)
 
 std::optional<uint8_t> FlacLowLevelInput::read_underlying()
 {
-  if (ssize_t(m_byte_buffer_index) >= m_byte_buffer_len) {
+  if (std::cmp_greater_equal(ssize_t(m_byte_buffer_index), m_byte_buffer_len)) {
     if (m_byte_buffer_len == -1) { return std::nullopt; }
     m_byte_buffer_start_pos += size_t(m_byte_buffer_len);
     update_crcs(0);
@@ -182,7 +182,7 @@ std::optional<uint8_t> FlacLowLevelInput::read_underlying()
     m_byte_buffer_index = 0;
   }
 
-  assert(ssize_t(m_byte_buffer_index) < m_byte_buffer_len);
+  assert(std::cmp_less(ssize_t(m_byte_buffer_index), m_byte_buffer_len));
   auto temp = m_byte_buffer.at(m_byte_buffer_index) & 0xFFU;
   m_byte_buffer_index++;
   return temp;
