@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <variant>
+#include <sys/types.h>
 #include <vector>
 
 namespace flac {
@@ -18,9 +18,9 @@ public:
   [[nodiscard]] virtual std::optional<size_t> get_bit_position() const = 0;
   virtual void seek_to(size_t pos) = 0;
 
-  virtual std::variant<uint32_t, int32_t> read_uint(size_t num_of_bits) = 0;
+  virtual int64_t read_uint(size_t num_of_bits) = 0;
   virtual int32_t read_signed_int(size_t num_of_bits) = 0;
-  virtual void read_rice_signed_ints(int param, std::vector<int64_t> &result, size_t start, size_t end) = 0;
+  virtual void read_rice_signed_ints(size_t param, std::vector<int64_t> &result, size_t start, size_t end) = 0;
   [[nodiscard]] virtual std::optional<uint8_t> read_byte() = 0;
   virtual void read_fully(std::vector<uint8_t> &bytes) = 0;
 
@@ -36,7 +36,7 @@ class FlacLowLevelInput : public IFlacLowLevelInput
 private:
   size_t m_byte_buffer_start_pos;
   std::vector<uint8_t> m_byte_buffer;
-  size_t m_byte_buffer_len;
+  ssize_t m_byte_buffer_len;
   size_t m_byte_buffer_index;
 
   uint64_t m_bit_buffer;
@@ -57,9 +57,9 @@ public:
   [[nodiscard]] std::optional<size_t> get_position() const override;
   [[nodiscard]] std::optional<size_t> get_bit_position() const override;
 
-  std::variant<uint32_t, int32_t> read_uint(size_t num_of_bits) override;
+  int64_t read_uint(size_t num_of_bits) override;
   int32_t read_signed_int(size_t num_of_bits) override;
-  void read_rice_signed_ints(int param, std::vector<int64_t> &result, size_t start, size_t end) override;
+  void read_rice_signed_ints(size_t param, std::vector<int64_t> &result, size_t start, size_t end) override;
   std::optional<uint8_t> read_byte() override;
   void read_fully(std::vector<uint8_t> &bytes) override;
   void reset_crcs() override;
