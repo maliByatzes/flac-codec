@@ -87,4 +87,70 @@ std::optional<uint64_t> FrameInfo::read_utf8_integer(IFlacLowLevelInput &input)
     return result;
   }
 }
+
+uint32_t FrameInfo::decode_block_size(uint8_t code, IFlacLowLevelInput &input)
+{
+  if ((code >> 4U) != 0) { throw std::invalid_argument("Code argument is invalid"); }
+
+  switch (static_cast<int>(code)) {
+  case 0:
+    throw std::runtime_error("Reserved block size");
+  case 6: {
+    auto val = input.read_uint(8) + 1;
+    return static_cast<uint32_t>(val);
+  }
+  case 7: {
+    auto val = input.read_uint(16) + 1;
+    return static_cast<uint32_t>(val);
+  }
+  default: {
+    auto result = search_second(BLOCK_SIZE_CODES, code);
+    if (result < 1 || result > 65536) { throw std::logic_error("Assertion failed."); }
+    return result;
+  }
+  }
+}
+
+std::optional<uint32_t> FrameInfo::decode_sample_rate(uint8_t code, IFlacLowLevelInput &input)
+{
+  if ((code >> 4U) != 0) { throw std::invalid_argument("Code argument is invalid"); }
+
+  switch (static_cast<int>(code)) {
+  case 0:
+    return std::nullopt;
+  case 12: {
+    auto val = input.read_uint(8);
+    return static_cast<uint32_t>(val);
+  }
+  case 13: {
+    auto val = input.read_uint(16);
+    return static_cast<uint32_t>(val);
+  }
+  case 14: {
+    auto val = input.read_uint(16) * 10;
+    return static_cast<uint32_t>(val);
+  }
+  case 15:
+    throw std::runtime_error("Invalid sample rate");
+  default: {
+    auto result = search_second(SAMPLE_RATE_CODES, code);
+    if (result < 1 || result > 655350) { throw std::logic_error("Assertion failed"); }
+    return result;
+  }
+  }
+}
+
+std::optional<uint16_t> FrameInfo::decode_bit_depth(uint8_t code)
+{
+  if ((code >> 3U) != 0) {
+    throw std::invalid_argument("Code argument is invalid");
+  } else if (static_cast<int>(code) == 0) {
+    return std::nullopt;
+  } else {
+    auto result = search_second(BIT_DEPTH_CODES, code);
+    if (result == -1) { throw std::runtime_error("Reserved bit depth"); }
+    if (result < 1 || result > 32) { throw std::logic_error("Assertion error"); }
+    return result;
+  }
+}
 }// namespace flac
