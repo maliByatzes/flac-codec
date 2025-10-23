@@ -1,3 +1,5 @@
+#include <bit>
+#include <cassert>
 #include <flac_codec/common/frame_info.h>
 #include <optional>
 #include <stdexcept>
@@ -43,9 +45,9 @@ std::optional<FrameInfo> FrameInfo::read_frame(IFlacLowLevelInput &input)
   result.m_bit_depth = decode_bit_depth(static_cast<uint8_t>(input.read_uint(3)));
   if (input.read_uint(1) != 0) { throw std::runtime_error("Reserved bit"); }
 
-  auto position = read_utf8_integer(input);
+  auto position = read_utf8_integer(input).value_or(0);
   if (static_cast<int>(blocking_strategy) != 0) {
-    if ((position >> 31) != 0) { throw std::runtime_error("Frame index too large"); }
+    if ((position >> 31U) != 0) { throw std::runtime_error("Frame index too large"); }
     result.m_frame_index = position;
     result.m_sample_offset = std::nullopt;
   } else if (static_cast<int>(blocking_strategy) == 1) {
@@ -63,4 +65,26 @@ std::optional<FrameInfo> FrameInfo::read_frame(IFlacLowLevelInput &input)
   return result;
 }
 
+std::optional<uint64_t> FrameInfo::read_utf8_integer(IFlacLowLevelInput &input)
+{
+  auto head = static_cast<uint8_t>(input.read_uint(8));
+  auto num_leading1s = std::countl_one(head);
+  assert(0 <= num_leading1s && num_leading1s <= 8);
+  if (num_leading1s == 0) {
+    return head;
+  } else if (num_leading1s == 1 || num_leading1s == 8) {
+    throw std::runtime_error("Invalid UTF-8 coded number");
+  } else {
+    uint64_t result = head & (0x7FU >> static_cast<uint16_t>(num_leading1s));
+    for (int i = 0; i < num_leading1s - 1; ++i) {
+      auto temp = static_cast<uint8_t>(input.read_uint(8));
+      if ((temp & 0xC0U) != 0x80U) { throw std::runtime_error("Invalid UTF-8 coded number"); }
+      result = (result << 6U) | (temp & 0x3FU);
+    }
+
+    if ((result >> 36U) != 0) { throw std::logic_error("Assertion error"); }
+
+    return result;
+  }
+}
 }// namespace flac
