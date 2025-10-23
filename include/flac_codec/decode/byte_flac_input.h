@@ -17,8 +17,10 @@ public:
 
   [[nodiscard]] std::optional<size_t> get_length() const override;
   void seek_to(size_t pos) override;
-  std::optional<uint64_t> read_underlying(std::vector<uint8_t> &buf, size_t off, size_t len) override;
   void close() override;
+
+protected:
+  std::optional<uint64_t> read_underlying(std::vector<uint8_t> &buf, size_t off, size_t len) override;
 };
 
 }// namespace flac
