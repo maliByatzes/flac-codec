@@ -1,6 +1,6 @@
 add_library(flac_codec_lib
-    flac_low_level_input.cpp
-    byte_flac_input.cpp
+    decode/flac_low_level_input.cpp
+    decode/byte_flac_input.cpp
 )
 
 target_link_libraries(flac_codec_lib

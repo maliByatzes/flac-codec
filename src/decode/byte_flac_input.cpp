@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <flac_codec/byte_flac_input.h>
-#include <flac_codec/flac_low_level_input.h>
+#include <flac_codec/decode/byte_flac_input.h>
+#include <flac_codec/decode/flac_low_level_input.h>
 #include <optional>
 #include <stdexcept>
 #include <utility>

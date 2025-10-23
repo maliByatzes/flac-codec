@@ -1,6 +1,6 @@
 #pragma once
 
-#include <flac_codec/flac_low_level_input.h>
+#include <flac_codec/decode/flac_low_level_input.h>
 #include <optional>
 #include <vector>
 
