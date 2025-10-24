@@ -36,8 +36,8 @@ private:
   static uint8_t get_sample_rate_code(uint32_t sample_rate);
   static uint8_t get_bit_depth_code(uint16_t bit_depth);
 
-  static std::optional<uint32_t> search_first(std::vector<std::vector<uint32_t>> &table, uint32_t key);
-  static std::optional<uint32_t> search_second(std::vector<std::vector<uint32_t>> &table, uint32_t key);
+  static std::optional<uint8_t> search_first(const std::vector<std::vector<uint32_t>> &table, uint32_t key);
+  static std::optional<uint32_t> search_second(const std::vector<std::vector<uint32_t>> &table, uint32_t key);
 
   const static inline std::vector<std::vector<uint32_t>> BLOCK_SIZE_CODES = { { 192, 1 },// NOLINT
     { 576, 2 },
@@ -53,13 +53,13 @@ private:
     { 16384, 14 },
     { 32768, 15 } };
 
-  const static inline std::vector<std::vector<uint32_t>> BIT_DEPTH_CODES = { { 8, 1 },
+  const static inline std::vector<std::vector<uint32_t>> BIT_DEPTH_CODES = { { 8, 1 },// NOLINT
     { 12, 2 },
     { 16, 4 },
     { 20, 5 },
     { 24, 6 } };
 
-  const static inline std::vector<std::vector<uint32_t>> SAMPLE_RATE_CODES = { { 88200, 1 },
+  const static inline std::vector<std::vector<uint32_t>> SAMPLE_RATE_CODES = { { 88200, 1 },// NOLINT
     { 176400, 2 },
     { 192000, 3 },
     { 8000, 4 },

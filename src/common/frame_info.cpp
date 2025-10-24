@@ -1,8 +1,11 @@
 #include <bit>
 #include <cassert>
+#include <cstdint>
 #include <flac_codec/common/frame_info.h>
+#include <flac_codec/decode/flac_low_level_input.h>
 #include <optional>
 #include <stdexcept>
+#include <vector>
 
 namespace flac {
 
@@ -104,7 +107,7 @@ uint32_t FrameInfo::decode_block_size(uint8_t code, IFlacLowLevelInput &input)
     return static_cast<uint32_t>(val);
   }
   default: {
-    auto result = search_second(BLOCK_SIZE_CODES, code);
+    auto result = search_second(BLOCK_SIZE_CODES, code).value_or(0);
     if (result < 1 || result > 65536) { throw std::logic_error("Assertion failed."); }
     return result;
   }
@@ -156,9 +159,10 @@ std::optional<uint16_t> FrameInfo::decode_bit_depth(uint8_t code)
 
 uint8_t FrameInfo::get_block_size_code(uint32_t block_size)
 {
-  auto result = search_first(BLOCK_SIZE_CODES, block_size);
-  if (result.has_value()) {
-    result = result.value();
+  auto tresult = search_first(BLOCK_SIZE_CODES, block_size);
+  uint8_t result = 0;
+  if (tresult.has_value()) {
+    result = tresult.value();
   } else if (1 <= block_size && block_size <= 256) {
     result = 6;
   } else if (1 <= block_size && block_size <= 65536) {
@@ -176,20 +180,21 @@ uint8_t FrameInfo::get_sample_rate_code(uint32_t sample_rate)
 {
   if (sample_rate == 0) { throw std::invalid_argument("Sample rate argument is invalid"); }
 
-  auto result = search_first(SAMPLE_RATE_CODES, sample_rate);
-  if (result.has_value()) {
-    result = result.value();
-  } else if (0 <= sample_rate && sample_rate < 256) {
+  auto tresult = search_first(SAMPLE_RATE_CODES, sample_rate);
+  uint8_t result = 0;
+  if (tresult.has_value()) {
+    result = tresult.value();
+  } else if (sample_rate < 256) {
     result = 12;
-  } else if (0 <= sample_rate && sample_rate < 65536) {
+  } else if (sample_rate < 65536) {
     result = 13;
-  } else if (0 <= sample_rate && sample_rate < 655360 && sample_rate % 10 == 0) {
+  } else if (sample_rate < 655360 && sample_rate % 10 == 0) {
     result = 14;
   } else {
     result = 0;
   }
 
-  if ((result >> 4) != 0) { throw std::logic_error("Assertion error"); }
+  if ((result >> 4U) != 0) { throw std::logic_error("Assertion error"); }
 
   return result;
 }
@@ -198,26 +203,28 @@ uint8_t FrameInfo::get_bit_depth_code(uint16_t bit_depth)
 {
   if (bit_depth < 1 || bit_depth > 32) { throw std::invalid_argument("Bit depth is not valid"); }
 
-  auto result = search_first(BIT_DEPTH_CODES, bit_depth);
-  if (!result.has_value()) {
+  auto tresult = search_first(BIT_DEPTH_CODES, bit_depth);
+  uint8_t result = 0;
+  if (!tresult.has_value()) {
     result = 0;
   } else {
-    result = result.value();
+    result = tresult.value();
   }
 
-  if ((result >> 3) != 0) { throw std::logic_error("Assertion error"); }
+  if ((result >> 3U) != 0) { throw std::logic_error("Assertion error"); }
 
   return result;
 }
 
-std::optional<uint32_t> FrameInfo::search_first(std::vector<std::vector<uint32_t>> &table, uint32_t key)
+std::optional<uint8_t> FrameInfo::search_first(const std::vector<std::vector<uint32_t>> &table, uint32_t key)
 {
   for (const auto &pair : table) {
-    if (pair[0] == key) { return pair[1]; }
+    if (pair[0] == key) { return static_cast<uint8_t>(pair[1]); }
   }
   return std::nullopt;
 }
-std::optional<uint32_t> search_second(std::vector<std::vector<uint32_t>> &table, uint32_t key)
+
+std::optional<uint32_t> search_second(const std::vector<std::vector<uint32_t>> &table, uint32_t key)
 {
   for (const auto &pair : table) {
     if (pair[1] == key) { return pair[0]; }
