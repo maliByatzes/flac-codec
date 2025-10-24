@@ -153,4 +153,76 @@ std::optional<uint16_t> FrameInfo::decode_bit_depth(uint8_t code)
     return result;
   }
 }
+
+uint8_t FrameInfo::get_block_size_code(uint32_t block_size)
+{
+  auto result = search_first(BLOCK_SIZE_CODES, block_size);
+  if (result.has_value()) {
+    result = result.value();
+  } else if (1 <= block_size && block_size <= 256) {
+    result = 6;
+  } else if (1 <= block_size && block_size <= 65536) {
+    result = 7;
+  } else {
+    throw std::invalid_argument("Block size argument is invalid");
+  }
+
+  if ((result >> 4U) != 0) { throw std::logic_error("Assertion error"); }
+
+  return result;
+}
+
+uint8_t FrameInfo::get_sample_rate_code(uint32_t sample_rate)
+{
+  if (sample_rate == 0) { throw std::invalid_argument("Sample rate argument is invalid"); }
+
+  auto result = search_first(SAMPLE_RATE_CODES, sample_rate);
+  if (result.has_value()) {
+    result = result.value();
+  } else if (0 <= sample_rate && sample_rate < 256) {
+    result = 12;
+  } else if (0 <= sample_rate && sample_rate < 65536) {
+    result = 13;
+  } else if (0 <= sample_rate && sample_rate < 655360 && sample_rate % 10 == 0) {
+    result = 14;
+  } else {
+    result = 0;
+  }
+
+  if ((result >> 4) != 0) { throw std::logic_error("Assertion error"); }
+
+  return result;
+}
+
+uint8_t FrameInfo::get_bit_depth_code(uint16_t bit_depth)
+{
+  if (bit_depth < 1 || bit_depth > 32) { throw std::invalid_argument("Bit depth is not valid"); }
+
+  auto result = search_first(BIT_DEPTH_CODES, bit_depth);
+  if (!result.has_value()) {
+    result = 0;
+  } else {
+    result = result.value();
+  }
+
+  if ((result >> 3) != 0) { throw std::logic_error("Assertion error"); }
+
+  return result;
+}
+
+std::optional<uint32_t> FrameInfo::search_first(std::vector<std::vector<uint32_t>> &table, uint32_t key)
+{
+  for (const auto &pair : table) {
+    if (pair[0] == key) { return pair[1]; }
+  }
+  return std::nullopt;
+}
+std::optional<uint32_t> search_second(std::vector<std::vector<uint32_t>> &table, uint32_t key)
+{
+  for (const auto &pair : table) {
+    if (pair[1] == key) { return pair[0]; }
+  }
+  return std::nullopt;
+}
+
 }// namespace flac
