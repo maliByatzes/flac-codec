@@ -4,6 +4,7 @@ add_library(flac_codec_lib
     decode/seekable_file_flac_input.cpp
 
     common/frame_info.cpp
+    common/seek_table.cpp
 )
 
 target_link_libraries(flac_codec_lib
