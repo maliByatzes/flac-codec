@@ -1,9 +1,9 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <flac_codec/common/frame_info.h>
-#include <span>
+#include <vector>
+
 namespace flac {
 
 class StreamInfo
@@ -17,10 +17,10 @@ public:
   uint8_t m_num_channels{};
   uint16_t m_bit_depth{};
   uint64_t m_num_samples{};
-  std::array<uint8_t, 16> m_md5_hash{};
+  std::vector<uint8_t> m_md5_hash;
 
   StreamInfo() = default;
-  explicit StreamInfo(std::span<const uint8_t> bytes);
+  explicit StreamInfo(const std::vector<uint8_t> &bytes);
 
   void check_values() const;
   void check_frame(FrameInfo &meta) const;

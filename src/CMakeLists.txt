@@ -5,6 +5,7 @@ add_library(flac_codec_lib
 
     common/frame_info.cpp
     common/seek_table.cpp
+    common/stream_info.cpp
 )
 
 target_link_libraries(flac_codec_lib
