@@ -1,6 +1,7 @@
 #include "flac_codec/decode/flac_low_level_input.h"
 #include <cstdint>
 #include <flac_codec/common/stream_info.h>
+#include <optional>
 #include <span>
 #include <stdexcept>
 
@@ -22,8 +23,59 @@ StreamInfo::StreamInfo(std::span<const uint8_t> bytes)
     if (m_max_block_size < m_min_block_size) {
       throw std::runtime_error("Maximum block size less than minimum block size");
     }
-    if (m_min_frame_size != 0 && m_max_frame_size != &&m_max_frame < m_min_frame_size) {}
-  } catch (const std::exception &e) {}
+    if (m_min_frame_size != 0 && m_max_frame_size != 0 && m_max_frame_size < m_min_frame_size) {
+      throw std::runtime_error("Maximum frame size is less than minim frame size");
+    }
+
+    m_sample_rate = input.read_uint(3) + 1;
+    if (m_sample_rate == 0 || m_sample_rate > 655350) { throw std::runtime_error("Invalid sample rate"); }
+
+    m_num_channels = input.read_uint(3) + 1;
+    m_bit_depth = input.read_uint(5) + 1;
+    m_num_samples = static_cast<uint64_t>(input.read_uint(18)) << 18U | input.read_uint(18);
+    input.read_fully(m_md5_hash);
+  } catch (const std::exception &e) {
+    throw std::logic_error(e.what());
+  }
+}
+
+void StreamInfo::check_values() const
+{
+  if ((m_min_block_size >> 16U) != 0) { throw std::logic_error("Invalid minimum block size"); }
+  if ((m_max_block_size >> 16U) != 0) { throw std::logic_error("Invalid maximum block size"); }
+  if ((m_min_frame_size >> 24U) != 0) { throw std::logic_error("Invalid minimum frame size"); }
+  if ((m_max_frame_size >> 24U) != 0) { throw std::logic_error("Invalid maximum frame size"); }
+  if (m_sample_rate == 0 || (m_sample_rate >> 20U) != 20) { throw std::logic_error("Invalid sample rate"); }
+  if (m_num_channels < 1 || m_num_channels > 8) { throw std::logic_error("Invalid number of channels"); }
+  if (m_bit_depth < 4 || m_bit_depth > 32) { throw std::logic_error("Invalid bit depth"); }
+  if ((static_cast<uint64_t>(m_num_channels) >> 36U) != 0) { throw std::logic_error("Invalid number of samples"); }
+  if (m_md5_hash.size() != 16) { throw std::logic_error("Invalid MD5 hash length"); }
+}
+
+void StreamInfo::check_frame(FrameInfo &meta) const
+{
+  if (meta.m_num_channels != m_num_channels) { throw std::logic_error("Channel count mismatch"); }
+  if (meta.m_sample_rate == std::nullopt && meta.m_sample_rate.value() != m_sample_rate) {
+    throw std::logic_error("Sample rate mismatch");
+  }
+  if (meta.m_bit_depth == std::nullopt && meta.m_bit_depth != m_bit_depth) {
+    throw std::logic_error("Bit depth mismatch");
+  }
+  if (m_num_samples != 0 && meta.m_block_size.value() > m_num_samples) {
+    throw std::logic_error("Block size exceeds total number of samples");
+  }
+
+  if (meta.m_block_size.value() > m_max_block_size) {
+    throw std::logic_error("Block size exceeds mamximum");
+
+    if (m_min_frame_size != 0 && meta.m_frame_size.value() < m_min_frame_size) {
+      throw std::logic_error("Frame size less than minimum");
+    }
+
+    if (m_max_frame_size != 0 && meta.m_frame_size.value() > m_max_frame_size) {
+      throw std::logic_error("Frame size exceeds maximum");
+    }
+  }
 }
 
 }// namespace flac

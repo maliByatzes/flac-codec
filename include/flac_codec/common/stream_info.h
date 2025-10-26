@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <flac_codec/common/frame_info.h>
 #include <span>
 namespace flac {
 
@@ -20,6 +21,11 @@ public:
 
   StreamInfo() = default;
   explicit StreamInfo(std::span<const uint8_t> bytes);
+
+  void check_values() const;
+  void check_frame(FrameInfo &meta) const;
+  // void write(bool last, BitOutputStream out);
+  // static std::array<uint8_t, 16> get_md5_hash(const std::vector<std::vector<uint8_t>> &sample, int depth);
 };
 
 }// namespace flac
