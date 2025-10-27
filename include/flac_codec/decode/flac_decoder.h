@@ -12,6 +12,8 @@
 
 namespace flac {
 
+using Samples = std::vector<std::vector<uint32_t>>;
+
 class FlacDecoder
 {
 public:
@@ -21,12 +23,19 @@ public:
   explicit FlacDecoder(const std::string &file_name);
 
   std::optional<std::pair<uint8_t, std::vector<uint8_t>>> read_and_handle_metadata_block();
-  static uint32_t read_audio_block(std::vector<std::vector<uint32_t>> &samples, int off);
+  static uint32_t read_audio_block(Samples &samples, int off);
+  uint32_t seek_and_read_audio_block(uint64_t pos, Samples &samples, int off);
 
 private:
   std::unique_ptr<IFlacLowLevelInput> m_input;
   std::optional<uint64_t> m_metadata_end_pos;
   // FrameDecoder m_frame_dec;
+
+  [[nodiscard]] std::vector<uint64_t> get_best_seek_point(uint64_t pos) const;
+  std::pair<uint64_t, uint64_t> seek_by_sync_and_decode(uint64_t pos);
+  std::optional<std::pair<uint64_t, uint64_t>> get_next_frame_offsets(uint64_t file_pos);
+  uint64_t get_sample_offset(FrameInfo &frame);
+  void close();
 };
 
 }// namespace flac
