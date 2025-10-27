@@ -21,6 +21,7 @@ public:
   explicit FlacDecoder(const std::string &file_name);
 
   std::optional<std::pair<uint8_t, std::vector<uint8_t>>> read_and_handle_metadata_block();
+  static uint32_t read_audio_block(std::vector<std::vector<uint32_t>> &samples, int off);
 
 private:
   std::unique_ptr<IFlacLowLevelInput> m_input;

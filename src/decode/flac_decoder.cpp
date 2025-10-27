@@ -1,3 +1,4 @@
+#include "flac_codec/common/frame_info.h"
 #include <flac_codec/common/seek_table.h>
 #include <flac_codec/common/stream_info.h>
 #include <flac_codec/decode/flac_decoder.h>
@@ -47,5 +48,19 @@ std::optional<std::pair<uint8_t, std::vector<uint8_t>>> FlacDecoder::read_and_ha
   }
 
   return std::make_pair(type, data);
+}
+
+uint32_t FlacDecoder::read_audio_block([[maybe_unused]] std::vector<std::vector<uint32_t>> &samples,
+  [[maybe_unused]] int off)
+{
+  /*
+  if (m_frame_dec == nullptr) { throw std::logic_error("Metadata blocks not fully consumed yet"); }
+  auto frame = m_frame_dec->read_frame(samples, off);
+  if (frame == nullptr) {
+    return 0;
+  } else {
+    return frame.block_size;
+  }*/
+  return 0;
 }
 }// namespace flac
