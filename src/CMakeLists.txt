@@ -1,11 +1,11 @@
 add_library(flac_codec_lib
     decode/flac_low_level_input.cpp
-    decode/byte_flac_input.cpp
-    decode/seekable_file_flac_input.cpp
+    #decode/byte_flac_input.cpp
+    #decode/seekable_file_flac_input.cpp
 
-    common/frame_info.cpp
-    common/seek_table.cpp
-    common/stream_info.cpp
+    #common/frame_info.cpp
+    #common/seek_table.cpp
+    #common/stream_info.cpp
 )
 
 target_link_libraries(flac_codec_lib

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <flac_codec/common/frame_info.h>
@@ -109,5 +110,91 @@ int32_t FrameDecoder::check_bit_depth(uint64_t val, uint32_t depth)
     const std::string msg(std::to_string(val) + " is not a signed " + std::to_string(depth) + "-bit value");
     throw std::invalid_argument(msg);
   }
+}
+
+void FrameDecoder::decode_subframe(uint32_t bit_depth, std::vector<int64_t> &result)
+{
+  if (bit_depth < 1 || bit_depth > 33) { throw std::invalid_argument("bit_depth is invalid"); }
+  if (result.size() < m_current_block_size.value_or(0)) { throw std::invalid_argument("result is invalid"); }
+
+  if (m_input->read_uint(1) != 0) { throw std::logic_error("Invalid padding bit"); }
+
+  auto type = static_cast<int>(m_input->read_uint(6));
+  auto shift = static_cast<int>(m_input->read_uint(1));
+
+  if (shift == 1) {
+    while (static_cast<int>(m_input->read_uint(1)) == 0) {
+      if (shift >= int(bit_depth)) { throw std::logic_error("Waste-bits-per-samples exceeds bit depth"); }
+      shift++;
+    }
+  }
+
+  if (!(0 <= shift && shift <= int(bit_depth))) { throw std::runtime_error("Assertion error"); }
+  bit_depth -= uint32_t(shift);
+
+  if (type == 0) {
+    std::fill(result.begin(), result.begin() + m_current_block_size.value_or(0), m_input->read_signed_int(bit_depth));
+  } else if (type == 1) {
+    for (size_t i = 0; i < m_current_block_size.value_or(0); ++i) { result[i] = m_input->read_signed_int(bit_depth); }
+  } else if (8 <= type && type <= 12) {
+    decode_fixed_prediction_subframe(type - 8, bit_depth, result);
+  } else if (32 <= type && type <= 63) {
+    decode_linear_predictive_coding_subframe(type - 31, bit_depth, result);
+  } else {
+    throw std::logic_error("Reserved subframe type");
+  }
+
+  if (shift > 0) {
+    for (size_t i = 0; i < m_current_block_size.value_or(0); ++i) { result[i] <<= shift; }// NOLINT
+  }
+}
+
+void FrameDecoder::decode_fixed_prediction_subframe(int pred_order, uint32_t bit_depth, std::vector<int64_t> &result)
+{
+  if (bit_depth < 1 || bit_depth > 33) { throw std::invalid_argument("bit_depth is invalid"); }
+  if (pred_order < 0 || pred_order >= FIXED_PREDICTION_COEFFICIENTS.size()) {
+    throw std::invalid_argument("pred_order id invalid");
+  }
+  if (pred_order > int(m_current_block_size.value_or(0))) {
+    throw std::logic_error("Fixed prediction order exceeds block size ");
+  }
+  if (result.size() < m_current_block_size.value_or(0)) { throw std::invalid_argument("result size is invalid"); }
+
+  for (size_t i = 0; i < size_t(pred_order); ++i) { result[i] = m_input->read_signed_int(bit_depth); }
+  read_residuals(pred_order, result);
+  restore_lpc(result, FIXED_PREDICTION_COEFFICIENTS[pred_order], bit_depth, 0);
+}
+
+void FrameDecoder::decode_linear_predictive_coding_subframe(int lpc_order,
+  uint32_t bit_depth,
+  std::vector<int64_t> &result)
+{
+  if (bit_depth < 1 || bit_depth > 33) { throw std::invalid_argument("bit_depth is invalid"); }
+  if (lpc_order < 1 || lpc_order > 32) { throw std::invalid_argument("lpc_order is invalid"); }
+  if (lpc_order > int(m_current_block_size.value_or(0))) { throw std::logic_error("LPC order exceeds block size"); }
+  if (result.size() < size_t(m_current_block_size.value_or(0))) {
+    throw std::invalid_argument("result size is invalid");
+  }
+
+  for (size_t i = 0; i < size_t(lpc_order); ++i) { result.at(i) = m_input->read_signed_int(bit_depth); }
+
+  auto precision = static_cast<int>(m_input->read_uint(4)) + 1;
+  if (precision == 16) { throw std::logic_error("Invalid LPC precision"); }
+
+  auto shift = m_input->read_signed_int(5);
+  if (shift < 0) { throw std::logic_error("Invalid LPC shift"); }
+
+  std::vector<int64_t> coefs(size_t(lpc_order));
+  for (size_t i = 0; i < coefs.size(); ++i) { coefs.at(i) = m_input->read_signed_int(size_t(precision)); }
+
+  read_residuals(lpc_order, result);
+  restore_lpc(result, coefs, bit_depth, shift);
+}
+
+void FrameDecoder::restore_lpc(std::vector<int64_t> &result, std::vector<int64_t> &coefs, uint32_t bit_depth, int shift)
+{
+  if (result.size() < m_current_block_size.value_or(0)) { throw std::invalid_argument("result size is invalid"); }
+  if (bit_depth < 1 || bit_depth > 33) { throw std::invalid_argument("bit_depth is invalid"); }
+  if (shift < 0 || shift > 63) { throw std::invalid_argument("shift is invalid"); }
 }
 }// namespace flac

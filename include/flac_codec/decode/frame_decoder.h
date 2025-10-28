@@ -29,6 +29,21 @@ private:
     std::vector<std::vector<int32_t>> &out_samples,
     uint64_t out_offset);
   static int32_t check_bit_depth(uint64_t val, uint32_t depth);
+  void decode_subframe(uint32_t bit_depth, std::vector<int64_t> &result);
+  void decode_fixed_prediction_subframe(int pred_order, uint32_t bit_depth, std::vector<int64_t> &result);
+
+  static const inline std::vector<std::vector<int64_t>> FIXED_PREDICTION_COEFFICIENTS = {
+    {},
+    { 1 },
+    { 2, -1 },
+    { 3, -3, 1 },
+    { 3, -3, 1 },
+    { 4, -6, 4, -1 },
+  };
+
+  void decode_linear_predictive_coding_subframe(int lpc_order, uint32_t bit_depth, std::vector<int64_t> &result);
+
+  void restore_lpc(std::vector<int64_t> &result, std::vector<int64_t> &coefs, uint32_t bit_depth, int shift);
 };
 
 }// namespace flac
