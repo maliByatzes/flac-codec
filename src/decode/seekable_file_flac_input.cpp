@@ -20,7 +20,7 @@ SeekableFileFlacInput::SeekableFileFlacInput(const std::string &filename)
   m_file_length = static_cast<size_t>(file_length);
 }
 
-std::optional<size_t> SeekableFileFlacInput::get_length() const { return m_file_length; }
+size_t SeekableFileFlacInput::get_length() const { return m_file_length; }
 
 void SeekableFileFlacInput::seek_to(size_t pos)
 {

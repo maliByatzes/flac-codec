@@ -18,7 +18,7 @@ private:
 public:
   explicit SeekableFileFlacInput(const std::string &filename);
 
-  std::optional<size_t> get_length() const override;
+  size_t get_length() const override;
   void seek_to(size_t pos) override;
   void close() override;
 
