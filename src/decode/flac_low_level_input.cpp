@@ -1,3 +1,4 @@
+#include "flac_codec/decode/data_format_exception.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -5,6 +6,7 @@
 #include <flac_codec/decode/flac_low_level_input.h>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <sys/types.h>
 #include <utility>
 #include <vector>
@@ -19,12 +21,12 @@ FlacLowLevelInput::FlacLowLevelInput()// NOLINT
   initialize_crcs();
 }
 
-std::optional<size_t> FlacLowLevelInput::get_position() const
+size_t FlacLowLevelInput::get_position() const
 {
   return (m_byte_buffer_start_pos + m_byte_buffer_index - (m_bit_buffer_len + 7U)) / 8U;
 }
 
-std::optional<size_t> FlacLowLevelInput::get_bit_position() const
+size_t FlacLowLevelInput::get_bit_position() const
 {
   return (-static_cast<int64_t>(m_bit_buffer_len)) & 7U;// NOLINT
 }
@@ -37,7 +39,7 @@ void FlacLowLevelInput::position_changed(size_t pos)
   m_byte_buffer_index = 0;
   m_bit_buffer = 0;
   m_bit_buffer_len = 0;
-  // reset_crcs(); FIXME: comment out 4 now
+  reset_crcs();
 }
 
 void FlacLowLevelInput::check_byte_aligned() const
@@ -47,8 +49,10 @@ void FlacLowLevelInput::check_byte_aligned() const
 
 int64_t FlacLowLevelInput::read_uint(size_t num_of_bits)
 {
-  if (num_of_bits > 32) { throw std::invalid_argument("Invalid argument, nidx is less than 0 or greater than 32"); }
-
+  if (num_of_bits > 32) {
+    const std::string msg{ "num_of_bits= " + std::to_string(num_of_bits) + ", is greater than 32" };
+    throw std::invalid_argument(msg);
+  }
 
   while (m_bit_buffer_len < num_of_bits) {
     auto tbyte = read_underlying();
@@ -60,30 +64,32 @@ int64_t FlacLowLevelInput::read_uint(size_t num_of_bits)
     assert(m_bit_buffer_len <= 64U);
   }
 
-  // NOTE: okay this might actually make the program go 💥
-  auto result = (m_bit_buffer) >> (m_bit_buffer_len - num_of_bits);// NOLINT
+  auto result = m_bit_buffer >> (m_bit_buffer_len - num_of_bits);
   if (num_of_bits != 32) {
     result &= (1U << num_of_bits) - 1U;
     assert((result >> num_of_bits) == 0U);
+    m_bit_buffer_len -= num_of_bits;
+    assert(m_bit_buffer_len <= 64U);
     return static_cast<uint32_t>(result);
   } else {
     m_bit_buffer_len -= num_of_bits;
-    assert(m_bit_buffer_len && m_bit_buffer_len <= 64U);
+    assert(m_bit_buffer_len <= 64U);
     return static_cast<int32_t>(result);
   }
 }
 
-// FIXME: this function is just the action and a disarter waiting to happen
 int32_t FlacLowLevelInput::read_signed_int(size_t num_of_bits)
 {
   auto shift = 32U - num_of_bits;
-  // NOTE: another imminent 💥
-  return static_cast<int32_t>((static_cast<uint64_t>(read_uint(num_of_bits)) << shift) >> shift);
+  return static_cast<int32_t>(read_uint(num_of_bits) << shift) >> shift;// NOLINT
 }
 
 void FlacLowLevelInput::read_rice_signed_ints(size_t param, std::vector<int64_t> &result, size_t start, size_t end)
 {
-  if (param > 31) { throw std::invalid_argument("Invalid argument"); }
+  if (param > 31) {
+    const std::string msg{ "param= " + std::to_string(param) + ", is greater than 32" };
+    throw std::invalid_argument(msg);
+  }
 
   auto unary_limit = 1UL << (53U - param);
 
@@ -93,7 +99,7 @@ void FlacLowLevelInput::read_rice_signed_ints(size_t param, std::vector<int64_t>
   while (true) {
     while (start <= end - RICE_DECODING_CHUNK) {
       if (m_bit_buffer_len < RICE_DECODING_CHUNK * RICE_DECODING_TABLE_BITS) {
-        if (ssize_t(m_byte_buffer_index) <= m_byte_buffer_len - 8) {
+        if (m_byte_buffer_index <= m_byte_buffer_len.value_or(0) - 8) {
           fill_bit_buffer();
         } else {
           break;
@@ -114,13 +120,13 @@ void FlacLowLevelInput::read_rice_signed_ints(size_t param, std::vector<int64_t>
     if (start >= end) { break; }
     size_t val = 0;
     while (read_uint(1) == 0) {
-      if (val >= unary_limit) { throw std::logic_error("Residual value is too large"); }
+      if (val >= unary_limit) { throw DataFormatException("Residual value too large"); }
       val++;
     }
     val = (val << param) | static_cast<uint32_t>(read_uint(param));
     assert((val >> 53U) == 0);
-    val = (val >> 1U) ^ -(val & 1U);// FIXME: this is could be wrong btw
-    // assert((val >> 52) == 0 || (val >> 52) == -1);
+    val = (val >> 1U) ^ -static_cast<uint64_t>(val & 1U);
+    assert((val >> 52U) == 0);
     result.at(start) = static_cast<int64_t>(val);
     start++;
   }
@@ -129,7 +135,7 @@ void FlacLowLevelInput::read_rice_signed_ints(size_t param, std::vector<int64_t>
 void FlacLowLevelInput::fill_bit_buffer()
 {
   auto iidx = m_byte_buffer_index;
-  auto nidx = std::min((64 - m_bit_buffer_len) >> 3U, size_t(m_byte_buffer_len) - iidx);
+  auto nidx = std::min((64 - m_bit_buffer_len) >> 3U, m_byte_buffer_len.value_or(0) - iidx);
   auto bytes = m_byte_buffer;
 
   if (nidx > 0) {
@@ -162,27 +168,25 @@ std::optional<uint8_t> FlacLowLevelInput::read_byte()
 
 void FlacLowLevelInput::read_fully(std::vector<uint8_t> &bytes)
 {
-  if (bytes.data() == nullptr) { throw std::invalid_argument("Bytes argument is invalid"); }
   check_byte_aligned();
   for (auto &byte : bytes) { byte = static_cast<uint8_t>(read_uint(8)); }
 }
 
 std::optional<uint8_t> FlacLowLevelInput::read_underlying()
 {
-  if (std::cmp_greater_equal(ssize_t(m_byte_buffer_index), m_byte_buffer_len)) {
-    if (m_byte_buffer_len == -1) { return std::nullopt; }
-    m_byte_buffer_start_pos += size_t(m_byte_buffer_len);
+  if (std::cmp_greater_equal(m_byte_buffer_index, m_byte_buffer_len.value_or(0))) {
+    if (!m_byte_buffer_len.has_value()) { return std::nullopt; }
+    m_byte_buffer_start_pos += m_byte_buffer_len.value();
     update_crcs(0);
     auto res = read_underlying(m_byte_buffer, 0, m_byte_buffer.size());
-    if (res == std::nullopt) { return res; }
-    auto result = res.value();
-    m_byte_buffer_len = ssize_t(result);
+    auto result = res.value_or(0);
+    m_byte_buffer_len = result;
     m_crc_start_index = 0;
     if (m_byte_buffer_len <= 0) { return std::nullopt; }
     m_byte_buffer_index = 0;
   }
 
-  assert(std::cmp_less(ssize_t(m_byte_buffer_index), m_byte_buffer_len));
+  assert(std::cmp_less(m_byte_buffer_index, m_byte_buffer_len.value_or(0)));
   auto temp = m_byte_buffer.at(m_byte_buffer_index) & 0xFFU;
   m_byte_buffer_index++;
   return temp;
@@ -215,12 +219,12 @@ uint16_t FlacLowLevelInput::get_crc16()
 void FlacLowLevelInput::update_crcs(size_t unused_trailing_bytes)
 {
   auto end = m_byte_buffer_index - unused_trailing_bytes;
-  for (size_t i = m_crc_start_index; i < end; ++i) {
+  for (size_t i = m_crc_start_index.value_or(0); i < end; ++i) {
     auto byte = m_byte_buffer.at(i) & 0xFFU;
     m_crc8 = CRC8_TABLE.at(m_crc8 ^ byte) & 0xFFU;
     m_crc16 = static_cast<uint16_t>(CRC16_TABLE.at((m_crc16 >> 8U) & byte) ^ ((m_crc16 & 0xFFU) << 8U));// NOLINT
-    assert((m_crc8 >> 8) == 0);// NOLINT
-    assert((m_crc16 >> 16) == 0);// NOLINT
+    assert((m_crc8 >> 8U) == 0);
+    assert((m_crc16 >> 16U) == 0);
   }
   m_crc_start_index = end;
 }
@@ -228,7 +232,7 @@ void FlacLowLevelInput::update_crcs(size_t unused_trailing_bytes)
 void FlacLowLevelInput::close()
 {
   m_byte_buffer.clear();
-  m_byte_buffer_len = -1;
+  m_byte_buffer_len = std::nullopt;
   m_byte_buffer_index = 0;
   m_bit_buffer = 0;
   m_bit_buffer_len = 0;
@@ -239,7 +243,6 @@ void FlacLowLevelInput::close()
 
 void FlacLowLevelInput::initialize_tables()
 {
-  // NOTE: this might soo bad or soo smart 🤷
   RICE_DECODING_CONSUMED_TABLES.assign(31, std::vector<uint8_t>(1U << RICE_DECODING_TABLE_BITS, 0));
 
   RICE_DECODING_VALUE_TABLES.assign(31, std::vector<uint32_t>(1U << RICE_DECODING_TABLE_BITS, 0));
