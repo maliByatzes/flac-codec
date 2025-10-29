@@ -13,7 +13,7 @@ class IFlacLowLevelInput// NOLINT
 public:
   virtual ~IFlacLowLevelInput() = default;
 
-  [[nodiscard]] virtual std::optional<size_t> get_length() const = 0;
+  [[nodiscard]] virtual size_t get_length() const = 0;
   [[nodiscard]] virtual size_t get_position() const = 0;
   [[nodiscard]] virtual size_t get_bit_position() const = 0;
   virtual void seek_to(size_t pos) = 0;

@@ -15,7 +15,7 @@ private:
 public:
   explicit ByteFlacInput(std::vector<uint8_t> bytes);
 
-  [[nodiscard]] std::optional<size_t> get_length() const override;
+  [[nodiscard]] size_t get_length() const override;
   void seek_to(size_t pos) override;
   void close() override;
 
