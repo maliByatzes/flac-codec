@@ -17,7 +17,7 @@ public:
 
   FrameDecoder(std::unique_ptr<IFlacLowLevelInput> &input, uint32_t expect_depth);
 
-  std::optional<FrameInfo> read_frame(std::vector<std::vector<int32_t>> &out_samples, uint64_t out_offset);
+  std::optional<FrameInfo> read_frame(std::vector<std::vector<int64_t>> &out_samples, size_t out_offset);
 
 private:
   std::vector<int64_t> m_temp0;
@@ -26,8 +26,8 @@ private:
 
   void decode_subframes(uint32_t bit_depth,
     int chan_asgn,
-    std::vector<std::vector<int32_t>> &out_samples,
-    uint64_t out_offset);
+    std::vector<std::vector<int64_t>> &out_samples,
+    size_t out_offset);
   static int32_t check_bit_depth(uint64_t val, uint32_t depth);
   void decode_subframe(uint32_t bit_depth, std::vector<int64_t> &result);
   void decode_fixed_prediction_subframe(int pred_order, uint32_t bit_depth, std::vector<int64_t> &result);

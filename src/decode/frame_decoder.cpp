@@ -15,7 +15,7 @@ FrameDecoder::FrameDecoder(std::unique_ptr<IFlacLowLevelInput> &input, uint32_t 
     m_current_block_size(std::nullopt)
 {}
 
-std::optional<FrameInfo> FrameDecoder::read_frame(std::vector<std::vector<int32_t>> &out_samples, uint64_t out_offset)
+std::optional<FrameInfo> FrameDecoder::read_frame(std::vector<std::vector<int64_t>> &out_samples, size_t out_offset)
 {
   if (!m_current_block_size.has_value()) { throw std::logic_error("Concurrent call"); }
 
@@ -38,13 +38,11 @@ std::optional<FrameInfo> FrameDecoder::read_frame(std::vector<std::vector<int32_
 
   decode_subframes(m_expected_bit_depth, meta.m_channel_assignment.value_or(0), out_samples, out_offset);
 
-  if (m_input->read_uint((8 - m_input->get_position().value_or(0)) % 8) != 0) {
-    throw std::logic_error("Invalid padding bits");
-  }
+  if (m_input->read_uint((8 - m_input->get_position()) % 8) != 0) { throw std::logic_error("Invalid padding bits"); }
   auto computed_crc16 = m_input->get_crc16();
   if (m_input->read_uint(16) != computed_crc16) { throw std::logic_error("CRC-16 mismatch"); }
 
-  auto frame_size = m_input->get_position().value_or(0) - start_byte.value_or(0);
+  auto frame_size = m_input->get_position() - start_byte;
   if (frame_size < 10) { throw std::logic_error("Assertion error"); }
   if (static_cast<uint32_t>(frame_size) != frame_size) { throw std::logic_error("Frame size too large"); }
 
@@ -57,7 +55,7 @@ std::optional<FrameInfo> FrameDecoder::read_frame(std::vector<std::vector<int32_
 void FrameDecoder::decode_subframes(uint32_t bit_depth,
   int chan_asgn,
   std::vector<std::vector<int32_t>> &out_samples,
-  uint64_t out_offset)
+  size_t out_offset)
 {
   if (bit_depth < 1 || bit_depth > 32) { throw std::invalid_argument("Bit depth is invalid"); }
   if ((static_cast<uint8_t>(chan_asgn) >> 4U) != 0) { throw std::invalid_argument("Channel assignment is invalid"); }
