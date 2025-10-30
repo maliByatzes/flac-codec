@@ -4,12 +4,16 @@
 #include <flac_codec/common/seek_table.h>
 #include <span>
 #include <stdexcept>
+#include <string>
 
 namespace flac {
 
 SeekTable::SeekTable(std::span<const uint8_t> data)
 {
-  if (data.size() % 18 != 0) { throw std::invalid_argument("Data contains a partial seek point"); }
+  if (data.size() % 18 != 0) {
+    const std::string msg{ "data.size()= " + std::to_string(data.size()) + ", is not divisible by 18" };
+    throw std::invalid_argument(msg);
+  }
 
   for (size_t i = 0; i < data.size(); ++i) {
     SeekPoint seek_point;
