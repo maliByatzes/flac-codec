@@ -40,7 +40,7 @@ std::optional<FrameInfo> FrameInfo::read_frame(IFlacLowLevelInput &input)
   result.m_channel_assignment = static_cast<uint8_t>(chan_asgn);
 
   if (chan_asgn < 8) {
-    result.m_num_channels = static_cast<uint16_t>(chan_asgn + 1);
+    result.m_num_channels = static_cast<uint8_t>(chan_asgn + 1);
   } else if (8 <= chan_asgn && chan_asgn <= 10) {
     result.m_num_channels = 2U;
   } else {

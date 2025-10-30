@@ -16,7 +16,7 @@ public:
 
   std::optional<uint32_t> m_frame_index;
   std::optional<size_t> m_sample_offset;
-  std::optional<uint16_t> m_num_channels;
+  std::optional<uint8_t> m_num_channels;
   std::optional<uint8_t> m_channel_assignment;
   std::optional<uint32_t> m_block_size;
   std::optional<uint32_t> m_sample_rate;
