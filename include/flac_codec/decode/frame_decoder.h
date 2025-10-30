@@ -28,10 +28,11 @@ private:
     int chan_asgn,
     std::vector<std::vector<int64_t>> &out_samples,
     size_t out_offset);
-  static int32_t check_bit_depth(uint64_t val, uint32_t depth);
+  static int32_t check_bit_depth(int64_t val, uint32_t depth);
   void decode_subframe(uint32_t bit_depth, std::vector<int64_t> &result);
-  void decode_fixed_prediction_subframe(int pred_order, uint32_t bit_depth, std::vector<int64_t> &result);
+  void decode_fixed_prediction_subframe(int64_t pred_order, uint32_t bit_depth, std::vector<int64_t> &result);
 
+  // NOLINTNEXTLINE
   static const inline std::vector<std::vector<int64_t>> FIXED_PREDICTION_COEFFICIENTS = {
     {},
     { 1 },
@@ -41,9 +42,9 @@ private:
     { 4, -6, 4, -1 },
   };
 
-  void decode_linear_predictive_coding_subframe(int lpc_order, uint32_t bit_depth, std::vector<int64_t> &result);
-
-  void restore_lpc(std::vector<int64_t> &result, std::vector<int64_t> &coefs, uint32_t bit_depth, int shift);
+  void decode_linear_predictive_coding_subframe(int64_t lpc_order, uint32_t bit_depth, std::vector<int64_t> &result);
+  void restore_lpc(std::vector<int64_t> &result, const std::vector<int64_t> &coefs, uint32_t bit_depth, int shift);
+  void read_residuals(int64_t warmup, std::vector<int64_t> &result);
 };
 
 }// namespace flac
