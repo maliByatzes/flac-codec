@@ -1,9 +1,12 @@
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <flac_codec/common/frame_info.h>
 #include <flac_codec/common/seek_table.h>
 #include <flac_codec/common/stream_info.h>
 #include <flac_codec/decode/data_format_exception.h>
 #include <flac_codec/decode/flac_decoder.h>
+#include <flac_codec/decode/frame_decoder.h>
 #include <flac_codec/decode/seekable_file_flac_input.h>
 #include <memory>
 #include <optional>
@@ -29,7 +32,7 @@ std::optional<std::pair<uint8_t, std::vector<uint8_t>>> FlacDecoder::read_and_ha
 {
   if (!m_metadata_end_pos.has_value()) { return std::nullopt; }
 
-  bool last = m_input->read_uint(1) != 0;
+  const bool last = m_input->read_uint(1) != 0;
   auto type = static_cast<uint8_t>(m_input->read_uint(7));
   auto length = static_cast<uint32_t>(m_input->read_uint(24));
   std::vector<uint8_t> data(length);
@@ -86,7 +89,7 @@ uint32_t FlacDecoder::seek_and_read_audio_block(uint64_t pos, Samples &samples, 
     if (!tframe.has_value()) { return 0; }
     auto frame = tframe.value();
 
-    uint64_t next_pos = curr_pos + frame.m_block_size.value_or(0);
+    const uint64_t next_pos = curr_pos + frame.m_block_size.value_or(0);
     if (next_pos > pos) {
       for (size_t ch = 0; ch < smpl.size(); ++ch) {
         std::copy(smpl[ch].begin() + long(pos - curr_pos),
@@ -105,7 +108,7 @@ std::pair<uint64_t, uint64_t> FlacDecoder::get_best_seek_point(uint64_t pos) con
   uint64_t sample_pos = 0;
   uint64_t file_pos = 0;
   if (m_seek_table != nullptr) {
-    for (SeekTable::SeekPoint point : m_seek_table->m_points) {
+    for (const SeekTable::SeekPoint point : m_seek_table->m_points) {
       if (point.m_sample_offset <= pos) {
         sample_pos = point.m_sample_offset;
         file_pos = point.m_file_offset;
@@ -124,7 +127,7 @@ std::pair<uint64_t, uint64_t> FlacDecoder::seek_by_sync_and_decode(uint64_t pos)
   uint64_t end = m_input->get_length();
 
   while (end - start > 100'000) {
-    uint64_t mid = (start + end) >> 1U;
+    const uint64_t mid = (start + end) >> 1U;
     auto offsets = get_next_frame_offsets(mid);
     if (!offsets.has_value() || offsets.value().first > pos) {
       end = mid;

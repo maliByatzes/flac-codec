@@ -7,7 +7,6 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <sys/types.h>
 #include <utility>
 #include <vector>
 
@@ -39,7 +38,7 @@ void FlacLowLevelInput::position_changed(size_t pos)
   m_byte_buffer_index = 0;
   m_bit_buffer = 0;
   m_bit_buffer_len = 0;
-  reset_crcs();
+  // reset_crcs();
 }
 
 void FlacLowLevelInput::check_byte_aligned() const
@@ -125,7 +124,7 @@ void FlacLowLevelInput::read_rice_signed_ints(size_t param, std::vector<int64_t>
     }
     val = (val << param) | static_cast<uint32_t>(read_uint(param));
     assert((val >> 53U) == 0);
-    val = (val >> 1U) ^ -static_cast<uint64_t>(val & 1U);
+    val = (val >> 1U) ^ -(val & 1U);
     assert((val >> 52U) == 0);
     result.at(start) = static_cast<int64_t>(val);
     start++;
