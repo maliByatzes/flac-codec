@@ -121,22 +121,22 @@ void StreamInfo::check_values() const
 
 void StreamInfo::check_frame(FrameInfo &meta) const
 {
-  if (!meta.m_num_channels.has_value() && meta.m_num_channels.value() != m_num_channels) {
-    const std::string msg{ "meta.num_channels= " + std::to_string(static_cast<int>(meta.m_num_channels.value()))
+  if (!meta.m_num_channels.has_value() && meta.m_num_channels.value_or(0) != m_num_channels) {
+    const std::string msg{ "meta.num_channels= " + std::to_string(static_cast<int>(meta.m_num_channels.value_or(0)))
                            + ", is not equal num_channels= " + std::to_string(static_cast<int>(m_num_channels))
                            + " (Chanel count mismatch)" };
     throw DataFormatException(msg);
   }
 
-  if (!meta.m_sample_rate.has_value() && meta.m_sample_rate.value() != m_sample_rate) {
-    const std::string msg{ "meta.sample_rate= " + std::to_string(meta.m_sample_rate.value())
+  if (!meta.m_sample_rate.has_value() && meta.m_sample_rate.value_or(0) != m_sample_rate) {
+    const std::string msg{ "meta.sample_rate= " + std::to_string(meta.m_sample_rate.value_or(0))
                            + ", is not equal sample_rate= " + std::to_string(m_sample_rate)
                            + " (Sample rate mismatch)" };
     throw DataFormatException(msg);
   }
 
-  if (!meta.m_bit_depth.has_value() && meta.m_bit_depth.value() != m_bit_depth) {
-    const std::string msg{ "meta.bit_depth= " + std::to_string(meta.m_bit_depth.value())
+  if (!meta.m_bit_depth.has_value() && meta.m_bit_depth.value_or(0) != m_bit_depth) {
+    const std::string msg{ "meta.bit_depth= " + std::to_string(meta.m_bit_depth.value_or(0))
                            + ", is not equal to bit_depth= " + std::to_string(m_bit_depth) + " (Bit depth mismatch)" };
     throw DataFormatException(msg);
   }

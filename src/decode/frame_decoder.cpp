@@ -1,14 +1,17 @@
-#include "flac_codec/decode/data_format_exception.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <flac_codec/common/frame_info.h>
+#include <flac_codec/decode/data_format_exception.h>
+#include <flac_codec/decode/flac_low_level_input.h>
 #include <flac_codec/decode/frame_decoder.h>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace flac {
 
@@ -25,7 +28,7 @@ std::optional<FrameInfo> FrameDecoder::read_frame(std::vector<std::vector<int64_
   auto tmeta = FrameInfo::read_frame(*m_input);
   if (!tmeta.has_value()) { return std::nullopt; }
   auto meta = tmeta.value();
-  if (!meta.m_bit_depth.has_value() && meta.m_bit_depth.value() != m_expected_bit_depth) {
+  if (!meta.m_bit_depth.has_value() && meta.m_bit_depth.value_or(0) != m_expected_bit_depth) {
     throw DataFormatException("Bit depth mismatch");
   }
 
@@ -63,8 +66,8 @@ void FrameDecoder::decode_subframes(uint32_t bit_depth,
   if ((static_cast<uint8_t>(chan_asgn) >> 4U) != 0) { throw std::invalid_argument("Channel assignment is invalid"); }
 
   if (0 <= chan_asgn && chan_asgn <= 7) {
-    int num_channels = chan_asgn + 1;
-    for (size_t ch = 0; ch < size_t(num_channels); ++ch) {
+    const int num_channels = chan_asgn + 1;
+    for (size_t ch = 0; std::cmp_less(ch, num_channels); ++ch) {
       decode_subframe(bit_depth, m_temp0);
       auto out_chan = out_samples[ch];
       for (size_t i = 0; i < m_current_block_size.value_or(0); ++i) {
@@ -127,7 +130,9 @@ void FrameDecoder::decode_subframe(uint32_t bit_depth, std::vector<int64_t> &res
 
   if (shift == 1) {
     while (m_input->read_uint(1) == 0) {
-      if (shift >= int64_t(bit_depth)) { throw DataFormatException("Waste-bits-per-samples exceeds bit depth"); }
+      if (std::cmp_greater_equal(shift, bit_depth)) {
+        throw DataFormatException("Waste-bits-per-samples exceeds bit depth");
+      }
       shift++;
     }
   }
@@ -160,12 +165,12 @@ void FrameDecoder::decode_fixed_prediction_subframe(int64_t pred_order,
   if (pred_order < 0 || size_t(pred_order) >= FIXED_PREDICTION_COEFFICIENTS.size()) {
     throw std::invalid_argument("pred_order id invalid");
   }
-  if (pred_order > int64_t(m_current_block_size.value_or(0))) {
+  if (std::cmp_greater(pred_order, m_current_block_size.value_or(0))) {
     throw DataFormatException("Fixed prediction order exceeds block size ");
   }
   if (result.size() < m_current_block_size.value_or(0)) { throw std::invalid_argument("result size is invalid"); }
 
-  for (size_t i = 0; i < size_t(pred_order); ++i) { result[i] = m_input->read_signed_int(bit_depth); }
+  for (size_t i = 0; std::cmp_less(i, pred_order); ++i) { result[i] = m_input->read_signed_int(bit_depth); }
   read_residuals(pred_order, result);
   restore_lpc(result, FIXED_PREDICTION_COEFFICIENTS.at(size_t(pred_order)), bit_depth, 0);
 }
@@ -181,7 +186,7 @@ void FrameDecoder::decode_linear_predictive_coding_subframe(int64_t lpc_order,
     throw std::invalid_argument("result size is invalid");
   }
 
-  for (size_t i = 0; i < size_t(lpc_order); ++i) { result.at(i) = m_input->read_signed_int(bit_depth); }
+  for (size_t i = 0; std::cmp_less(i, lpc_order); ++i) { result.at(i) = m_input->read_signed_int(bit_depth); }
 
   auto precision = m_input->read_uint(4) + 1;
   if (precision == 16) { throw DataFormatException("Invalid LPC precision"); }
@@ -222,18 +227,18 @@ void FrameDecoder::restore_lpc(std::vector<int64_t> &result,
 
 void FrameDecoder::read_residuals(int64_t warmup, std::vector<int64_t> &result)
 {
-  if (warmup < 0 || warmup > m_current_block_size.value_or(0)) {
+  if (warmup < 0 || std::cmp_greater(warmup, m_current_block_size.value_or(0))) {
 
 
     auto method = m_input->read_uint(2);
     if (method >= 2) { throw DataFormatException("Reserved residual coding method"); }
     assert(method == 0 || method == 1);
 
-    int param_bits = method == 0 ? 4 : 5;
-    int escape_param = method == 0 ? 0xF : 0x1F;
+    const int param_bits = method == 0 ? 4 : 5;
+    const int escape_param = method == 0 ? 0xF : 0x1F;
 
     auto partition_order = m_input->read_uint(4);
-    uint64_t num_partitions = 1U << static_cast<uint8_t>(partition_order);
+    const uint64_t num_partitions = 1U << static_cast<uint8_t>(partition_order);
 
     if (m_current_block_size.value_or(0) % num_partitions != 0) {
       throw DataFormatException("Block size not divisible by number of Rice partitions");
